@@ -1,37 +1,44 @@
 #!/usr/bin/env python2
+# Manage the UPS pico.
+# Send emails, pulse train and trigger shutdown
 # Import the libraries to use time delays, send os commands and access GPIO pins
 import RPi.GPIO as GPIO
 import time
 import os
 import socket
-import smtplib
 import smbus
+import datetime
 import pico_status
 
-fqdn = socket.getfqdn()
+# Configurable variables
+checkInterval=5 # Interval between checking powering mode in seconds
+shutdownDelay=1 # Delay before shutdown in minutes
+minBatteryLevel=3.5 # Minimum battery level before shutdown triggers
 
+# Mail configuration
+fqdn = socket.getfqdn()
 sendmail = "/usr/sbin/sendmail"
 sender = "root@" + fqdn
 receivers = ["root"]
 
 #--------------------------------------------------------
-# msgid=1 started
-# msgid=2 onbatt
-# msgid=3 shutdown
+# msgid=START,ONBATT,CRIT,ONLINE,SHUTDOWN
 def mailMessage(msgid):
-  if(msgid==1):
+  if(msgid=="START"):
     subject = fqdn + " UPS system started"
     text = fqdn + " UPS system started"
-  elif(msgid==2):
+  elif(msgid=="ONBATT"):
     subject = fqdn + " UPS Power Failure !!!"
     text = fqdn + " UPS power failure.  Now running on Battery"
-  elif (msgid==3):
+  elif (msgid=="CRIT"):
     subject = fqdn + " UPS Power Critical. Shutting down !!!"
     text = fqdn + " UPS Power Critical. System will shutdown and restart when power is restored"
-  elif (msgid==4):
+  elif (msgid=="ONLINE"):
     subject = fqdn + " UPS Power Restored."
     text = fqdn + " UPS Power Restored. Now running on line"
-
+  elif (msgid=="SHUTDOWN"):
+    subject = fqdn + " UPS Shutdown by Power Button"
+    text = fqdn + " UPS Shutdown by Power Button"
   message = """\
 From: %s
 To: %s
@@ -50,42 +57,73 @@ Subject: %s
 # mailMessage()
 #--------------------------------------------------------
  
-def pwr_mode():
-   data = i2c.read_byte_data(0x69, 0x00)
-   data = data & ~(1 << 7)
-   return data
+def checkBatteryLevel():
+  if (pico_status.bat_level() < minBatteryLevel):
+    return "LOW"
+  else:
+    return "OK"
 
-mailMessage(1)
-
+# Initialise board
 GPIO.setmode(GPIO.BCM) # Set pin numbering to board numbering
 GPIO.setup(27, GPIO.IN, pull_up_down=GPIO.PUD_UP) # Setup pin 27 as an input
 GPIO.setup(22, GPIO.OUT) # Setup pin 22 as an output
 i2c = smbus.SMBus(1)
-onbatt=False
-online=True
+
+# Initialise variables
+# onbatt/online flags
+# 0=not, 1=first detect, 2=second detect, >2=message sent
+onbatt=0
+online=2
+lastTime = datetime.datetime.now()
+started=False
 
 while True: # Setup a while loop to wait for a button press
+    # Send keepalive pulse to ups
     GPIO.output(22,True)
     time.sleep(0.25) # Allow a sleep time of 0.25 second to reduce CPU usage
     GPIO.output(22,False)
-    pwrmode=pwr_mode()
-    if(pwrmode==2):
-      if (onbatt!=True):
-        print "ONBATT"
-        mailMessage(2)
-      onbatt=True
-      online=False
-    elif(pwrmode==1):
-      if (online!=True):
-        print "ONLINE"
-        mailMessage(4)
-      online=True
-      onbatt=False
-    if(GPIO.input(27)==0): # Setup an if loop to run a shutdown command when button press sensed
-        mailMessage(3)
-        sleep(5)
-    	os.system("shutdown -h now Shutdown by UPS") # Send shutdown command to os
-    	break
-
     time.sleep(0.25) # Allow a sleep time of 0.25 second to reduce CPU usage
+    
+    # Every checkInterval seconds check powering mode
+    if (datetime.datetime.now() > (lastTime + datetime.timedelta(seconds=checkInterval))):
+      if not started:
+        started=True
+        # Send startup message after initial checkInterval
+        mailMessage("START")
 
+      lastTime = datetime.datetime.now()
+      pwrmode=pico_status.pwr_mode()
+      if(pwrmode=="ONBATT"):
+        # Running On battery
+        onbatt+=1
+        online=0
+        if (onbatt == 2):
+          # Same state for 5 seconds or more
+          print pwrmode
+          mailMessage("ONBATT")
+        elif (onbatt > 3):
+          # No need to count above 3
+          onbatt=3
+          if (checkBatteryLevel()=="LOW"):
+            # Report and shutdown
+            mailMessage("CRIT")
+    	    os.system("shutdown -h +% 'UPS Battery Low. Shutting down.'" % shutdownDelay)
+
+      elif(pwrmode=="ONLINE"):
+        # Running On line
+        online+=1
+        onbatt=0
+        if (online == 2):
+          # Same state for 5 seconds or more
+          print pwrmode
+          mailMessage("ONLINE")
+        elif (online > 3):
+          # No need to count above 3
+          online=3
+    
+    # Setup an if loop to run a shutdown command when button press sensed
+    if(GPIO.input(27)==0): 
+      mailMessage("SHUTDOWN")
+      sleep(5) # Allow to actually send mail
+      os.system("shutdown -h now") # Send shutdown command to os
+      break
