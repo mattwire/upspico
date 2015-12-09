@@ -71,7 +71,7 @@ xbmc =      commands.getstatusoutput("i2cget -y 1 0x6B 23")
 fssd_tout =   commands.getstatusoutput("i2cget -y 1 0x6B 24")
 
 status =   ['OFF', 'ON']
-buz_fan_modes =   ['Disabled', 'Enabled', 'Automatic']
+buz_fan_modes =   ['Disabled', 'Enabled', 'Automatic', 'Unknown']
 fan_speeds =   ['0', '100', '25', '50', '75']
 
 VERSION =    version[1][2:]
