@@ -13,7 +13,7 @@ import pico_status
 # Configurable variables
 checkInterval=5 # Interval between checking powering mode in seconds
 shutdownDelay=1 # Delay before shutdown in minutes
-minBatteryLevel=3.5 # Minimum battery level before shutdown triggers
+minBatteryLevel=3.4 # Minimum battery level before shutdown triggers
 
 # Mail configuration
 fqdn = socket.getfqdn()
@@ -37,8 +37,8 @@ def mailMessage(msgid):
     subject = fqdn + " UPS Power Restored."
     text = fqdn + " UPS Power Restored. Now running on line"
   elif (msgid=="SHUTDOWN"):
-    subject = fqdn + " UPS Shutdown by Power Button"
-    text = fqdn + " UPS Shutdown by Power Button"
+    subject = fqdn + " UPS Triggered Shutdown"
+    text = fqdn + " UPS Triggered Shutdown"
   message = """\
 From: %s
 To: %s
@@ -107,7 +107,7 @@ while True: # Setup a while loop to wait for a button press
           if (checkBatteryLevel()=="LOW"):
             # Report and shutdown
             mailMessage("CRIT")
-    	    os.system("shutdown -h +% 'UPS Battery Low. Shutting down.'" % shutdownDelay)
+    	    os.system("/sbin/shutdown -h +% 'UPS Battery Low. Shutting down.'" % shutdownDelay)
 
       elif(pwrmode=="ONLINE"):
         # Running On line
@@ -124,6 +124,6 @@ while True: # Setup a while loop to wait for a button press
     # Setup an if loop to run a shutdown command when button press sensed
     if(GPIO.input(27)==0): 
       mailMessage("SHUTDOWN")
-      sleep(5) # Allow to actually send mail
-      os.system("shutdown -h now") # Send shutdown command to os
+      time.sleep(5) # Allow to actually send mail
+      os.system("/sbin/shutdown -h now") # Send shutdown command to os
       break
