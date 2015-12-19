@@ -3,6 +3,12 @@ Scripts for the UPS PIco from http://www.pimodules.com/
 
 These are tested and working on a Debian 8 (Stretch) system with systemd.
 
+## Scripts - Descriptions
+* pico_register_readout.py: Read all registers and output
+* pico_status.py: Output status (voltage, onbattery etc. in the same format as apcaccess so you can use the same scripts to parse the output).
+* picofssd_mail.py: UPS monitoring script.  Requires something like nullmailer to allow the system to actually send emails.  Monitors the UPS, checks for charging and sends emails on status change.
+* picofu2.py: Firmware updater.
+
 ## Setup
 ```
 mkdir /opt/upspicp
