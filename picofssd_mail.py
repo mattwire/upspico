@@ -77,8 +77,9 @@ i2c = smbus.SMBus(1)
 # 0=not, 1=first detect, 2=second detect, >2=message sent
 onbatt=0
 online=2
-batlevel=0
-newbatlevel=0
+battV=0
+minBattV=battV
+maxBattV=battV
 lastTime = datetime.datetime.now()
 started=False
 
@@ -122,14 +123,20 @@ while True: # Setup a while loop to wait for a button press
           # Same state for 5 seconds or more
           print pwrmode
           mailMessage("ONLINE")
-        elif (online > 3):
-          # No need to count above 3
-          online=3
-          # Check that battery is charging
-          newbatlevel=pico_status.bat_level()
-          if ((newbatlevel < batlevel) and (newbatlevel < 4.1)):
-            mailMessage("BATNOCHARGE")
-          batlevel=newbatlevel
+        elif (online > 2):
+          # Check that battery is charging and UPS is alive
+          battV=pico_status.bat_level()
+          if (battV < minBattV):
+            minBattV=battV
+          if (battV > maxBattV):
+            maxBattV=battV
+          if (online == 102):
+            # On the 102th cycle (5mins) maxBattV should be greater than minBattV if charging
+            if ((maxBattV <= minBattV) and (minBattV < 4.1)):
+              mailMessage("BATNOCHARGE")
+          # Count 3 to 102 (100 cycles) to check V over one minute
+          if (online > 101):
+            online = 3
     
     # Setup an if loop to run a shutdown command when button press sensed
     if(GPIO.input(27)==0): 
