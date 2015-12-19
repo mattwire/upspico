@@ -26,7 +26,7 @@ receivers = ["root"]
 def mailMessage(msgid):
   if(msgid=="START"):
     subject = fqdn + " UPS system started"
-    text = fqdn + " UPS system started"
+    text = subject
   elif(msgid=="ONBATT"):
     subject = fqdn + " UPS Power Failure !!!"
     text = fqdn + " UPS power failure.  Now running on Battery"
@@ -38,7 +38,10 @@ def mailMessage(msgid):
     text = fqdn + " UPS Power Restored. Now running on line"
   elif (msgid=="SHUTDOWN"):
     subject = fqdn + " UPS Triggered Shutdown"
-    text = fqdn + " UPS Triggered Shutdown"
+    text = subject
+  elif (msgid=="BATNOCHARGE"):
+    subject = fqdn + " UPS Battery not charging !!!"
+    text = subject
   message = """\
 From: %s
 To: %s
@@ -74,6 +77,8 @@ i2c = smbus.SMBus(1)
 # 0=not, 1=first detect, 2=second detect, >2=message sent
 onbatt=0
 online=2
+batlevel=0
+newbatlevel=0
 lastTime = datetime.datetime.now()
 started=False
 
@@ -120,6 +125,11 @@ while True: # Setup a while loop to wait for a button press
         elif (online > 3):
           # No need to count above 3
           online=3
+          # Check that battery is charging
+          newbatlevel=pico_status.bat_level()
+          if ((newbatlevel < batlevel) and (newbatlevel < 4.1)):
+            mailMessage("BATNOCHARGE")
+          batlevel=newbatlevel
     
     # Setup an if loop to run a shutdown command when button press sensed
     if(GPIO.input(27)==0): 
