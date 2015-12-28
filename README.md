@@ -11,7 +11,7 @@ These are tested and working on a Debian 8 (Stretch) system with systemd.
 
 ## Setup
 ```
-mkdir /opt/upspicp
+mkdir /opt/upspico
 cd /opt/upspico
 git clone https://github.com/mattwire/upspico.git
 ```
