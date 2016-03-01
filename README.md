@@ -56,3 +56,6 @@ dtparam=spi=on
 ## Useful Commands
 ### Set on battery runtime to maximum
 `i2cset -y 1 0x6b 0x09 0xff`
+
+### Update firmware
+`i2cset -y 1 0x6b 0x00 0xff && ./picofu3.py -v -f UPS_PIco.hex`
